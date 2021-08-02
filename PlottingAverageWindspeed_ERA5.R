@@ -92,14 +92,14 @@ uv2ddff <- function(u, v = NULL, rad = FALSE){
 # hourly, single level: https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-era5-single-levels?tab=form
 # monthly averaged, single level: https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-era5-single-levels-monthly-means?tab=form
 ########################################################################
-
-wind <- read_ncdf("/Users/tziporahserota/Desktop/Thorne Lab/Analyses/Wind/ERA5Datasets/2019_MonthlyAveraged.nc")
+setwd("/Users/tziporahserota/Desktop/Thorne Lab/Analyses/Wind/Datasets/ERA5Datasets/")
+wind <- read_ncdf("/Users/tziporahserota/Desktop/Thorne Lab/Analyses/Wind/Datasets/ERA5Datasets/2019_MonthlyAveraged.nc")
 times<-st_get_dimension_values(wind, "time") # months
 wind_u<-as(wind[1,,,], "Raster") # u-component
 wind_v<-as(wind[2,,,], "Raster")# v-component 
 
 ########################################################################
-# Calculate annual average wind components
+# Option 1: Calculate annual average wind components
 ########################################################################
 wind_u.df = raster::as.data.frame(wind_u, xy = TRUE) # convert to data frame 
 colnames(wind_u.df) <- c("lon", "lat","January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December") # change column names
@@ -108,7 +108,7 @@ wind_v.df = raster::as.data.frame(wind_v, xy = TRUE) # convert to data frame
 colnames(wind_v.df) <- c("lon", "lat","January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December") # change column names
 
 
-# Calculate annual average u and v component
+# annual average u and v component
 wind_u.df$Avg_u <- rowMeans(wind_u.df[, c(-1, -2)])
 wind_v.df$Avg_v <- rowMeans(wind_v.df[, c(-1, -2)])
 
@@ -128,7 +128,9 @@ wind_Avg <- full_join(wind_uAvg, wind_vAvg,by=c("lon", "lat")) # data frame of y
 res<-uv2ddff(wind_Avg$Avg_u, wind_Avg$Avg_v)
 wind_Avg$wind_speed<- res$ff
 
-# November - December 2019 only 
+########################################################################
+# Option 2: Calculate monthly average wind components
+########################################################################
 wind_u_NovDec2019 <- wind_u.df[,c(1, 2, 13, 14) ]
 wind_v_NovDec2019 <- wind_v.df[,c(1, 2, 13, 14) ]
 
@@ -136,9 +138,6 @@ wind_v_NovDec2019 <- wind_v.df[,c(1, 2, 13, 14) ]
 wind_u_NovDec2019$Avg_u <- rowMeans(wind_u_NovDec2019[, c(-1, -2)])
 wind_v_NovDec2019$Avg_v <- rowMeans(wind_v_NovDec2019[, c(-1, -2)])
 
-  
-  wind_u_NovDec2019$Avg_u <- rowMeans(wind_u_NovDec2019[, c(-1, -2)])
-wind_v_NovDec2019$Avg_v <- rowMeans(wind_v_NovDec2019[, c(-1, -2)])
 
 wind_u_NovDecAvg <- wind_u_NovDec2019[, c(1, 2, 5)] # new dataframe with only averages
 wind_v_NovDecAvg <- wind_v_NovDec2019[, c(1, 2, 5)]
@@ -147,6 +146,23 @@ wind_NovDecAvg <- full_join(wind_u_NovDecAvg, wind_v_NovDecAvg,by=c("lon", "lat"
 
 res<-uv2ddff(wind_NovDecAvg$Avg_u, wind_NovDecAvg$Avg_v)
 wind_NovDecAvg$wind_speed<- res$ff
+
+########################################################################
+# Option 3: Calculate wind components per month
+########################################################################
+wind_u_Nov2019 <- wind_u.df[,c(1, 2, 13) ]
+wind_v_Nov2019 <- wind_v.df[,c(1, 2, 13) ]
+wind_Nov2019 <- full_join(wind_u_Nov2019, wind_v_Nov2019,by=c("lon", "lat")) # join u and v components
+colnames(wind_Nov2019) <- c("lon", "lat", "u", "v")
+res<-uv2ddff(wind_Nov2019$u, wind_Nov2019$v)
+wind_Nov2019$wind_speed<- res$ff
+
+wind_u_Dec2019 <- wind_u.df[,c(1, 2, 14) ]
+wind_v_Dec2019 <- wind_v.df[,c(1, 2, 14) ]
+wind_Dec2019 <- full_join(wind_u_Dec2019, wind_v_Dec2019,by=c("lon", "lat")) # join u and v components
+colnames(wind_Dec2019) <- c("lon", "lat", "u", "v")
+res<-uv2ddff(wind_Dec2019$u, wind_Dec2019$v)
+wind_Dec2019$wind_speed<- res$ff
 ########################################################################
 # Plotting
 ########################################################################
@@ -158,6 +174,7 @@ GPS$lon <- GPS$lon-360
 # Plot tracks of each species
 GPS$labels <- GPS$species
 GPS$labels <- factor(GPS$labels, levels = unique(GPS$species))
+world<- map_data("world")
 
 ggplot(wind_NovDecAvg,aes(lon,lat))+
   geom_raster(aes(fill=wind_speed),interpolate = T,alpha=.75)+
@@ -171,7 +188,19 @@ ggplot(wind_NovDecAvg,aes(lon,lat))+
   ggtitle("2019 Tracks")+
   theme_bw()
 
-dropdir <- '/Users/tziporahserota/Desktop/Thorne Lab/Analyses/Wind/Wind_maps/'
-ggsave(paste0(dropdir,'Tracks_2019.png'))
+dropdir <- '/Users/tziporahserota/Desktop/Thorne Lab/Analyses/Wind/Wind_maps/Maps/2019 Maps/'
+ggsave(paste0(dropdir,'Tracks_2019speed.png'))
 
 
+# only wind speed maps
+ggplot(wind_Nov2019,aes(lon,lat))+
+  geom_raster(aes(fill=wind_speed),interpolate = T,alpha=.75)+
+  scale_fill_viridis(name="Wind Speed")+
+  geom_polygon(data=world,aes(x=long,y=lat, group=group),color='black',fill=NA)+
+  coord_sf(xlim = c(-85, -20), ylim = c(-70, -40)) +
+  xlab("Longitude")+
+  ylab("Latitude")+
+  theme_bw()
+
+dropdir <- '/Users/tziporahserota/Desktop/Thorne Lab/Analyses/Wind/Wind_maps/Maps/2019 Maps/'
+ggsave(paste0(dropdir,'NovAvgWindspeed.png'))

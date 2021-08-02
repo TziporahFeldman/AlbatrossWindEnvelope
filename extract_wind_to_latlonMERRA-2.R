@@ -40,6 +40,8 @@ library(maps)# world maps for ggplot
 # File specification: https://gmao.gsfc.nasa.gov/pubs/docs/Bosilovich785.pdf
 # How to download the data: https://daac.gsfc.nasa.gov/information/howto?title=How%20to%20Download%20MERRA-2%20Daily%20Mean%20Data
 # How to calculate and plot wind speed using MERRA-2 wind component: https://disc.gsfc.nasa.gov/information/howto?title=How%20to%20calculate%20and%20plot%20wind%20speed%20using%20MERRA-2%20wind%20component%20data%20using%20Python
+# Hourly Data: https://disc.gsfc.nasa.gov/datasets/M2I1NXASM_5.12.4/summary
+
 
 setwd("/Users/tziporahserota/Desktop/Merra-2Datasets/Nov-Jan2019_hourly/")
 a <- list.files("/Users/tziporahserota/Desktop/Merra-2Datasets/Nov-Jan2019_hourly/", pattern = ".nc4")
@@ -47,17 +49,6 @@ a <- list.files("/Users/tziporahserota/Desktop/Merra-2Datasets/Nov-Jan2019_hourl
 # ---------- ---------- ---------- ---------- ---------- ---------- ---------- ----------
 #  Create list of times
 # ---------- ---------- ---------- ---------- ---------- ---------- ---------- ----------
-times1<-st_get_dimension_values(wind, "time") # months
-times2<-st_get_dimension_values(wind_2, "time")
-
-all_times<-as.tibble(c(times1, times2))
-all_times.name<-as.character(c(times1, times2))
-all_times_num<-as.numeric(unlist(all_times))
-
-# ---------- ---------- ---------- ---------- ---------- ---------- ---------- ----------
-#  Isolate U and V components for 2 and 10 m 
-# ---------- ---------- ---------- ---------- ---------- ---------- ---------- ----------
-# U-component, 2 m 
 for (i in 1:length(a)) {
   mi<-read_ncdf(a[i])
   times <- st_get_dimension_values(mi, "time")
@@ -71,6 +62,21 @@ for (i in 1:length(a)) {
 all_times<-as.tibble(times_all)
 all_times.name<-as.character(all_times)
 all_times_num<-as.numeric(unlist(all_times))
+
+# ---------- ---------- ---------- ---------- ---------- ---------- ---------- ----------
+#  Isolate U and V components for 2 and 10 m 
+# ---------- ---------- ---------- ---------- ---------- ---------- ---------- ----------
+# U-component, 2 m 
+for (i in 1:length(a)) {
+  mi<-read_ncdf(a[i])
+  wind_u<-as(mi[1,,,], "Raster")
+  wind_u.df= raster::as.data.frame(wind_u, xy = TRUE)
+  if (i==1) {
+    wind_U2M<-wind_u.df
+  }else{
+    wind_U2M<-cbind(wind_U2M,wind_u.df[, -c(1,2)])
+  }
+}
 
 # V-component, 2 m 
 for (i in 1:length(a)) {
@@ -91,9 +97,9 @@ for (i in 1:length(a)) {
   wind_u<-as(mi[6,,,], "Raster")
   wind_u.df= raster::as.data.frame(wind_u, xy = TRUE)
   if (i==1) {
-    wind_U2M<-wind_u.df
+    wind_U10M<-wind_u.df
   }else{
-    wind_U10M<-cbind(wind_U2M,wind_u.df[, -c(1,2)])
+    wind_U10M<-cbind(wind_U10M,wind_u.df[, -c(1,2)])
   }
 }
 
@@ -103,9 +109,9 @@ for (i in 1:length(a)) {
   wind_v<-as(mi[4,,,], "Raster")
   wind_v.df= raster::as.data.frame(wind_v, xy = TRUE)
   if (i==1) {
-    wind_V2M<-wind_v.df
+    wind_V10M<-wind_v.df
   }else{
-    wind_V10M<-cbind(wind_V2M,wind_v.df[, -c(1,2)])
+    wind_V10M<-cbind(wind_V10M,wind_v.df[, -c(1,2)])
   }
 }
 
