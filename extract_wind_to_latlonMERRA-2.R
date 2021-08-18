@@ -1,16 +1,10 @@
 #################################################################################
 # Load Libraries 
 #################################################################################
-library(ggplot2) # plots 
 library(tidyverse) # data cleanup
 library(sf) # spatial
-library(rnaturalearth)
-library(rnaturalearthdata)
-library(ggspatial) # spatial ggplot
 library(rgeos)
 library(raster) # convert netcdf to raster
-library(rworldmap)
-library(shape)
 library(ncmeta)
 library(ncdf4)
 library(RNetCDF)
@@ -20,14 +14,9 @@ library(rgdal)
 library(stars) 
 library(lattice)
 library(rasterVis) # vectorplot
-library(colorRamps) # matlab.like
-library(viridisLite)# color palette
 library(DescTools) #closest
 library(imputeTS) #na.interpolation
 library(swfscMisc)
-require(RColorBrewer) # color palette
-library(viridis)# color palette
-library(maps)# world maps for ggplot
 
 ##########################################################################################
 # AUXILIARY FUNCTIONS
@@ -90,7 +79,8 @@ Lon360to180 <- function(lon){
 #################################################################################
 # Download and Import data
 #################################################################################
-# -80, -70, -20, -30 Extent 
+# -80, -70, -20, -30 Extent for Bird Island (-30N -70S -80W -20E)
+# -180, 20, 180, 40 Extent for Midway (40N, 20S, 165W, -170E) NOTE:  cannot cross anti-meridian, had to do -180 to 180. Alternatively, could download two files for each if files are too big?
 # ---------- ---------- ---------- ---------- ---------- ---------- ---------- ----------
 #  Useful Links
 # ---------- ---------- ---------- ---------- ---------- ---------- ---------- ----------
@@ -100,8 +90,8 @@ Lon360to180 <- function(lon){
 # Hourly Data: https://disc.gsfc.nasa.gov/datasets/M2I1NXASM_5.12.4/summary
 
 
-setwd("/Users/tziporahserota/Desktop/Thorne Lab/Analyses/Wind/Datasets/Merra-2Datasets/Nov2019-Jan2020_hourly/")
-a <- list.files("/Users/tziporahserota/Desktop/Thorne Lab/Analyses/Wind/Datasets/Merra-2Datasets/Nov2019-Jan2020_hourly/", pattern = ".nc4")
+setwd("/Volumes/GoogleDrive/My Drive/THORNE_LAB/Data/Feldman_Analysis/Wind/Merra-2Datasets/Hourly/Jan2019-Mar2019_hourly/")
+a <- list.files("/Volumes/GoogleDrive/My Drive/THORNE_LAB/Data/Feldman_Analysis/Wind/Merra-2Datasets/Hourly/Jan2019-Mar2019_hourly/", pattern = ".nc")
 
 # ---------- ---------- ---------- ---------- ---------- ---------- ---------- ----------
 #  Create list of times
@@ -126,7 +116,7 @@ all_times_num<-as.numeric(unlist(all_times))
 # U-component, 2 m 
 for (i in 1:length(a)) {
   mi<-read_ncdf(a[i])
-  wind_u<-as(mi[1,,,], "Raster")
+  wind_u<-as(mi[2,,,], "Raster")
   wind_u.df= raster::as.data.frame(wind_u, xy = TRUE)
   if (i==1) {
     wind_U2M<-wind_u.df
@@ -138,7 +128,7 @@ for (i in 1:length(a)) {
 # V-component, 2 m 
 for (i in 1:length(a)) {
   mi<-read_ncdf(a[i])
-  wind_v<-as(mi[3,,,], "Raster")
+  wind_v<-as(mi[5,,,], "Raster")
   wind_v.df= raster::as.data.frame(wind_v, xy = TRUE)
   if (i==1) {
     wind_V2M<-wind_v.df
@@ -151,7 +141,7 @@ for (i in 1:length(a)) {
 # U-component, 10 m 
 for (i in 1:length(a)) {
   mi<-read_ncdf(a[i])
-  wind_u<-as(mi[6,,,], "Raster")
+  wind_u<-as(mi[1,,,], "Raster")
   wind_u.df= raster::as.data.frame(wind_u, xy = TRUE)
   if (i==1) {
     wind_U10M<-wind_u.df
@@ -173,44 +163,74 @@ for (i in 1:length(a)) {
 }
 
 
+# U-component, 50 m 
+for (i in 1:length(a)) {
+  mi<-read_ncdf(a[i])
+  wind_u<-as(mi[3,,,], "Raster")
+  wind_u.df= raster::as.data.frame(wind_u, xy = TRUE)
+  if (i==1) {
+    wind_U50M<-wind_u.df
+  }else{
+    wind_U50M<-cbind(wind_U50M,wind_u.df[, -c(1,2)])
+  }
+}
+
+# V-component, 50 m 
+for (i in 1:length(a)) {
+  mi<-read_ncdf(a[i])
+  wind_v<-as(mi[6,,,], "Raster")
+  wind_v.df= raster::as.data.frame(wind_v, xy = TRUE)
+  if (i==1) {
+    wind_V50M<-wind_v.df
+  }else{
+    wind_V50M<-cbind(wind_V50M,wind_v.df[, -c(1,2)])
+  }
+}
+
+
+# convert to rasters
 u_stack2M<-rasterFromXYZ(wind_U2M)
 v_stack2M<-rasterFromXYZ(wind_V2M)
 u_stack10M<-rasterFromXYZ(wind_U10M)
 v_stack10M<-rasterFromXYZ(wind_V10M)
+u_stack50M<-rasterFromXYZ(wind_U50M)
+v_stack50M<-rasterFromXYZ(wind_V50M)
 
 ####################################################################################################
 # 2. Read in hourly bird locations and gather wind data
 ####################################################################################################
 int_now <- 3600
-
-setwd(paste0('/Volumes/GoogleDrive/.shortcut-targets-by-id/1-mLOKt79AsOpkCFrunvcUj54nuqPInxf/THORNE_LAB/Data!/Conners_Bird_Island/2019_2020/Tag_Data/L1_cleaned-data/GPS_L1_3_interpolated/', int_now, 's/'))
+setwd(paste0('/Volumes/GoogleDrive/My Drive/THORNE_LAB/Data/Feldman_Analysis/Wind/WAAL_L1_interpolated/WAAL_2018-2019_brood-guard/', int_now, 's/'))
 files<-list.files(pattern = ".csv")
 
 # Append all individual bird lat lon files to one file ------
 for (i in 1:length(files)) {
-  mi<-read.csv(files[i])
+  bi<-read.csv(files[i])
   if (i==1) {
-    m<-mi
+    b<-bi
   }else{
-    m<-rbind(m,mi)
+    b<-rbind(b,bi)
   }
 } 
 
 # Add speed, distance, bearing columns to m -----------------
-m$ground_speed_kmHr <- NA
-m$distanceij_km <- NA
-m$bearingij <- NA
-m$U2M<- NA
-m$V2M<- NA
-m$U10M<- NA
-m$V10M<- NA
-m$wind_speed2M <- NA
-m$wind_speed10M <- NA
+b$ground_speed_kmHr <- NA
+b$distanceij_km <- NA
+b$bearingij <- NA
+b$U2M<- NA
+b$V2M<- NA
+b$U10M<- NA
+b$V10M<- NA
+b$U50M<- NA
+b$V50M<- NA
+b$wind_speed2M <- NA
+b$wind_speed10M <- NA
+b$wind_speed50M <- NA
 
 
-trips<- unique(m$tripID)
+trips<- unique(b$tripID)
 for (i in 1:length(trips)) {
-  tripi<-m[m$tripID==trips[i],]
+  tripi<-b[b$tripID==trips[i],]
   
   for (j in 1:length(tripi$id)-1) {
     hour_int<- int_now/3600 # int_now is in seconds (3600 seconds in one hour)
@@ -219,16 +239,16 @@ for (i in 1:length(trips)) {
     tripi$bearingij[j]<-as.numeric(bearing(tripi$lat[j],tripi$lon[j],tripi$lat[j+1],tripi$lon[j+1])[1])
   }
   
-  m[m$tripID==trips[i],]<-tripi
+  b[b$tripID==trips[i],]<-tripi
   
 }
 
 # ---------- ---------- ---------- ---------- ---------- ---------- ---------- ----------
 # Loop through m and add wind information: u, v, velocity for 2M and 10M
 # ---------- ---------- ---------- ---------- ---------- ---------- ---------- ----------
-for ( j in 1:length(m$id)) {
+for ( j in 1:length(b$id)) {
   
-  timej <- as.POSIXct(m$datetime[j], format = "%Y-%m-%d %H:%M:%S" , tz = "UTC")
+  timej <- as.POSIXct(b$datetime[j], format = "%Y-%m-%d %H:%M:%S" , tz = "UTC")
   timej_num <- as.numeric(timej)
   # Find index of current_time in all times. Use that index to pull out relevant raster layer. 
   raster_dt_index <- as.numeric(which(abs(all_times_num-timej_num) == min(abs(all_times_num-timej_num))))
@@ -238,22 +258,29 @@ for ( j in 1:length(m$id)) {
   vstack_timej2 <- subset(v_stack2M, raster_dt_index, drop=TRUE)
   ustack_timej10 <- subset(u_stack10M, raster_dt_index, drop=TRUE)
   vstack_timej10 <- subset(v_stack10M, raster_dt_index, drop=TRUE)
+  ustack_timej50 <- subset(u_stack50M, raster_dt_index, drop=TRUE)
+  vstack_timej50 <- subset(v_stack50M, raster_dt_index, drop=TRUE)
   
   # isolate coordinates
-  xy_j <- as.data.frame(cbind(m$lon[j], m$lat[j]))
+  xy_j <- as.data.frame(cbind(b$lon[j], b$lat[j]))
   colnames(xy_j) <- c("lon","lat")
   xy_j$lon <- Lon360to180(xy_j$lon) # not necessary for midway
   
   # Extract u and v components for time j at location x and y
   u_j2 <- extract(ustack_timej2, xy_j)
   v_j2 <- extract(vstack_timej2, xy_j)
-  m$U2M[j]<- u_j2
-  m$V2M[j]<- v_j2
+  b$U2M[j]<- u_j2
+  b$V2M[j]<- v_j2
   
   u_j10 <- extract(ustack_timej10, xy_j)
   v_j10 <- extract(vstack_timej10, xy_j)
-  m$U10M[j]<- u_j10
-  m$V10M[j]<- v_j10
+  b$U10M[j]<- u_j10
+  b$V10M[j]<- v_j10
+  
+  u_j50 <- extract(ustack_timej50, xy_j)
+  v_j50 <- extract(vstack_timej50, xy_j)
+  b$U50M[j]<- u_j50
+  b$V50M[j]<- v_j50
   # -----------------------------------------------------------------------------
   # Get Wind Direction and Wind Velocity from U and V Components:
   # -----------------------------------------------------------------------------
@@ -265,16 +292,20 @@ for ( j in 1:length(m$id)) {
   # 180 from South, and 270 from West) or in mathematical radiant if input \code{rad = TRUE}.
   
   res2M<-uv2ddff(u_j2, v_j2)
-  m$wind_speed2M[j] <- res2M$ff
+  b$wind_speed2M[j] <- res2M$ff
   
   res10M<-uv2ddff(u_j10, v_j10)
-  m$wind_speed10M[j] <- res10M$ff
+  b$wind_speed10M[j] <- res10M$ff
+  
+  res50M<-uv2ddff(u_j50, v_j50)
+  b$wind_speed50M[j] <- res50M$ff
 }
 
-spvec <- substr(m$id,1,4)
-m<-m %>% mutate(species=spvec)
+spvec <- substr(b$id,1,4)
+b<-b %>% mutate(species=spvec)
+b$year <- "2018-2019"
 
-write_csv(m, '/Volumes/GoogleDrive/.shortcut-targets-by-id/1-mLOKt79AsOpkCFrunvcUj54nuqPInxf/THORNE_LAB/Data!/Feldman_Analysis/Wind/wind_paired-data/2019-2020/hourly/allbirds_hourly.csv')
+write_csv(b, '/Volumes/GoogleDrive/My Drive/THORNE_LAB/Data/Feldman_Analysis/Wind/wind_paired-data/L0_paired/2018-2019_WAAL_brood-guard/hourly/allbirds_hourly.csv')
 
 
 ####################################################################################################
@@ -284,12 +315,12 @@ write_csv(m, '/Volumes/GoogleDrive/.shortcut-targets-by-id/1-mLOKt79AsOpkCFrunvc
 # Import 30s lat lon data and append individual bird files into one file. 
 int_now <- 30
 
-setwd(paste0('/Volumes/GoogleDrive/.shortcut-targets-by-id/1-mLOKt79AsOpkCFrunvcUj54nuqPInxf/THORNE_LAB/Data!/Conners_Bird_Island/2019_2020/Tag_Data/L1_cleaned-data/GPS_L1_3_interpolated/', int_now, 's/'))
+setwd(paste0('/Volumes/GoogleDrive/My Drive/THORNE_LAB/Data/Feldman_Analysis/Wind/WAAL_L1_interpolated/WAAL_2018-2019_brood-guard/', int_now, 's/'))
 files<-list.files(pattern=".csv")
 
 # Append all individual bird lat lon files to one file ------
 for (i in 1:length(files)) {
-  mi<-read.csv(files[i])
+  mi<-read.csv(files[i]) 
   if (i==1) {
     m_hi<-mi
   }else{
@@ -305,13 +336,20 @@ m_hi$U2M<- NA
 m_hi$V2M<- NA
 m_hi$U10M<- NA
 m_hi$V10M<- NA
+m_hi$U50M<- NA
+m_hi$V50M<- NA
 m_hi$wind_speed2M <- NA
 m_hi$wind_speed10M <- NA
+m_hi$wind_speed50M <- NA
 m_hi$wind_dir3602M <- NA
 m_hi$wind_dir36010M <- NA
-m_hi$windshear <- NA
-m_hi$bwa<- NA
-m_hi$bwa_class<- NA
+m_hi$wind_dir36050M <- NA
+m_hi$windshear10m <- NA
+m_hi$windshear50m <- NA
+m_hi$bwa2M<- NA
+m_hi$bwa_class2M<- NA
+m_hi$bwa10M<- NA
+m_hi$bwa_class10M<- NA
 
 # -----------------------------------------------------------------------------
 # Add Bird Speed, Distance, Bearing
@@ -337,9 +375,11 @@ for (i in 1:length(trips)) {
 # -----------------------------------------------------------------------------
 
 # Import hourly lat lon with wind u and v
-m_lo <- m
+m_lo <- b
 # m_lo <- read.csv('/Volumes/GoogleDrive/.shortcut-targets-by-id/1-mLOKt79AsOpkCFrunvcUj54nuqPInxf/THORNE_LAB/Data!/Feldman_Analysis/Wind/wind_paired-data/2019-2020/hourly/allbirds_hourly.csv')
 birds<-unique(m_lo$id)
+
+
 
 for (i in 1:length(birds)) {
   birdi<-birds[i]
@@ -357,6 +397,8 @@ for (i in 1:length(birds)) {
     mi_hi$V2M[match_ix] <- mi_lo$V2M[j]
     mi_hi$U10M[match_ix] <- mi_lo$U10M[j]
     mi_hi$V10M[match_ix] <- mi_lo$V10M[j]
+    mi_hi$U50M[match_ix] <- mi_lo$U50M[j]
+    mi_hi$V50M[match_ix] <- mi_lo$V50M[j]
   }
   rm(j)
   # Interpolate between hourly u and v
@@ -366,6 +408,8 @@ for (i in 1:length(birds)) {
   mi_hi$V2M<-na_interpolation(mi_hi$V2M, option = "linear")
   mi_hi$U10M<-na_interpolation(mi_hi$U10M, option = "linear")
   mi_hi$V10M<-na_interpolation(mi_hi$V10M, option = "linear")
+  mi_hi$U50M<-na_interpolation(mi_hi$U50M, option = "linear")
+  mi_hi$V50M<-na_interpolation(mi_hi$V50M, option = "linear")
   
   for (j in 1:length(mi_hi$id)) {
     # Calculate Wind Speed and DIrection from u and v and BWA, BWAClass
@@ -378,38 +422,53 @@ for (i in 1:length(birds)) {
     mi_hi$wind_speed10M[j] <- ddff10M$ff
     mi_hi$wind_dir36010M[j]<-ddff10M$dd
     
-    mi_hi$windshear[j]<-  mi_hi$wind_speed10M[j]- mi_hi$wind_speed2M[j]
+    ddff50M <- uv2ddff(mi_hi$U50M[j],mi_hi$V50M[j])
+    mi_hi$wind_speed50M[j] <- ddff50M$ff
+    mi_hi$wind_dir36050M[j]<-ddff50M$dd
+    
+    # calculate windshear
+    mi_hi$windshear10m[j]<-  abs(mi_hi$wind_speed10M[j]- mi_hi$wind_speed2M[j])
+    mi_hi$windshear50m[j]<-  abs(mi_hi$wind_speed50M[j]- mi_hi$wind_speed10M[j])
     
     # bird-wind-angle
-    bird_wind_angle<-abs(Lon360to180(mi_hi$bearingij[j]-mi_hi$wind_dir3602M[j]))
+    bird_wind_angle2M<-abs(Lon360to180(mi_hi$bearingij[j]-mi_hi$wind_dir3602M[j]))
+    bird_wind_angle10M<-abs(Lon360to180(mi_hi$bearingij[j]-mi_hi$wind_dir36010M[j]))
     
     # bwa class
-    # Definitions from Spear and Ainley 1997
-    # Headwind  = abs(bird-wind): 0-59 
-    # Crosswind = abs(bird-wind): 60-119 
-    # Tailwind =  abs(bird-wind): 120-180 
-    if (is.na(bird_wind_angle)) {
-      mi_hi$bwa_class[j] <- NA
+    if (is.na(bird_wind_angle2M)) {
+      mi_hi$bwa_class2M[j] <- NA
     }else{
-      if (bird_wind_angle < 50) {
-        mi_hi$bwa_class[j] <- "Head-Wind"
-      }else if (bird_wind_angle > 130) {
-        mi_hi$bwa_class[j] <- "Tail-Wind"
+      if (bird_wind_angle2M < 50) {
+        mi_hi$bwa_class2M[j] <- "Head-Wind"
+      }else if (bird_wind_angle2M > 130) {
+        mi_hi$bwa_class2M[j] <- "Tail-Wind"
       }else{
-        mi_hi$bwa_class[j] <- "Cross-Wind"
+        mi_hi$bwa_class2M[j] <- "Cross-Wind"
       }
     }
+    mi_hi$bwa2M[j] <- bird_wind_angle2M
     
-    mi_hi$bwa[j] <- bird_wind_angle
-  
+    if (is.na(bird_wind_angle10M)) {
+      mi_hi$bwa_class10M[j] <- NA
+    }else{
+      if (bird_wind_angle10M < 50) {
+        mi_hi$bwa_class10M[j] <- "Head-Wind"
+      }else if (bird_wind_angle10M > 130) {
+        mi_hi$bwa_class10M[j] <- "Tail-Wind"
+      }else{
+        mi_hi$bwa_class10M[j] <- "Cross-Wind"
+      }
+    }
+    mi_hi$bwa10M[j] <- bird_wind_angle10M
   }
   
   spvec<-substr(birdi, 1, 4)
   mi_hi$species<-spvec
+  mi_hi$year <- "2019-2020"
   
   
   # write individual bird file
-  dir_i<-paste0('/Volumes/GoogleDrive/.shortcut-targets-by-id/1-mLOKt79AsOpkCFrunvcUj54nuqPInxf/THORNE_LAB/Data/Feldman_Analysis/Wind/wind_paired-data/2019-2020/indiv_birds/', birdi, '_wind_bwa.csv')
+  dir_i<-paste0('/Volumes/GoogleDrive/My Drive/THORNE_LAB/Data/Feldman_Analysis/Wind/wind_paired-data/L0_paired/2018-2019_WAAL_brood-guard/indiv_birds/', birdi, '_wind_bwa.csv')
   write_csv(mi_hi, dir_i)
   
   rm(list=ls()[! ls() %in% c("wrap360", "uv2ddff", "Lon360to180", "birds", "m_lo", "m_hi", "i", "int_now")])
